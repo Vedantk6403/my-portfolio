@@ -121,6 +121,37 @@
         .mac-dot.red { background: #ff5f56; } 
         .mac-dot.yellow { background: #ffbd2e; } 
         .mac-dot.green { background: #27c93f; }
+        /* ========================================= */
+        /* --- MOBILE RESPONSIVENESS --- */
+        /* ========================================= */
+        
+        @media screen and (max-width: 768px) {
+
+            body {
+                padding: 30px 5%; 
+            }
+
+            h1 {
+                font-size: 2rem; 
+                word-wrap: break-word;
+            }
+            
+            h2 {
+                font-size: 1.5rem; 
+                margin-top: 35px;
+            }
+            
+            p {
+                font-size: 1rem;
+            }
+            pre {
+                padding: 40px 15px 15px; 
+                font-size: 0.85rem;
+            }
+            .metadata {
+                font-size: 0.8rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -310,4 +341,5 @@ printf '\x56\x11\x40' >> payload</code></pre>
 </body>
 
 </html>
+
 
