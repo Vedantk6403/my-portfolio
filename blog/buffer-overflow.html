@@ -190,7 +190,7 @@ int main(int argc, char **argv) {
                 <li><code>-no-pie</code>: Disables Position Independent Executables, ensuring the binary's code segment is loaded at a static memory address rather than being randomized by ASLR.</li>
             </ul>
 
-            <img src="images/compilation_and_security_vals.png" alt="Checksec output verifying disabled protections" loading="lazy">
+            <img src="../images/compilation_and_security_vals.png" alt="Checksec output verifying disabled protections" loading="lazy">
             <p>Using <code>checksec</code>, we verify the environment. <strong>NX is disabled</strong> (stack execution allowed), <strong>Canary is absent</strong>, and <strong>PIE is off</strong>.</p>
         </div>
 
@@ -198,15 +198,15 @@ int main(int argc, char **argv) {
         <div class="fade-in">
             <p>To hijack the control flow, we must overwrite the Return Address (RIP) stored on the stack. But how much padding is required to reach it? I utilized GDB and a cyclic pattern to find the exact offset.</p>
             
-            <img src="images/run_gdb_withpattern.png" alt="Running GDB with a cyclic pattern" loading="lazy">
+            <img src="../images/run_gdb_withpattern.png" alt="Running GDB with a cyclic pattern" loading="lazy">
 
             <p>By feeding a cyclic pattern into the program, a <code>SIGSEGV</code> (Segmentation Fault) is triggered upon returning from <code>echo_input</code>.</p>
             
-            <img src="images/program_crash.png" alt="Segmentation fault in GDB" loading="lazy">
-            <img src="images/value_at_topofstack.png" alt="Examining the top of the stack in GDB" loading="lazy">
+            <img src="../images/program_crash.png" alt="Segmentation fault in GDB" loading="lazy">
+            <img src="../images/value_at_topofstack.png" alt="Examining the top of the stack in GDB" loading="lazy">
             
             <p>Inspecting the stack pointer (<code>x/1xg $rsp</code>) at the moment of the crash reveals the value <code>0x6341356341346341</code>. Using <code>msf-pattern_offset</code>, this exact hex value equates to a length of <strong>72 bytes</strong>.</p>
-            <img src="images/offset_calculate.png" alt="Examining the top of the stack in GDB" loading="lazy">
+            <img src="../images/offset_calculate.png" alt="Examining the top of the stack in GDB" loading="lazy">
         </div>
 
         <h2 class="fade-in">4. Understanding the 72-Byte Offset</h2>
@@ -236,7 +236,7 @@ int main(int argc, char **argv) {
             <p>Here lies the architectural challenge. The address of our target, <code>secret_function</code>, is <code>0x0000000000401156</code>.</p>
             <p>If we inject the full 8-byte address in Little Endian format (<code>\x56\x11\x40\x00\x00\x00\x00\x00</code>), <code>strcpy</code> will read the <code>\x56</code>, <code>\x11</code>, <code>\x40</code>, and then instantly stop at the first <code>\x00</code>. The rest of the address is discarded, and the stack alignment is ruined.</p>
             
-            <img src="images/Address_of_target_func.png" alt="Finding the target function address" loading="lazy">
+            <img src="../images/Address_of_target_func.png" alt="Finding the target function address" loading="lazy">
 
             <h3>The Solution</h3>
             <p>We do not overwrite the entire address. We examine the stack <em>before</em> corruption and observe that the upper 5 bytes of the original Return Address are already <code>0x0000000000</code>. Therefore, we only append the lower 3 significant bytes (<code>\x56\x11\x40</code>) to our payload.</p>
@@ -257,11 +257,11 @@ printf 'A%.0s' {1..72} > payload
 printf '\x56\x11\x40' >> payload</code></pre>
             </div>
 
-            <img src="images/payload_creation.png" alt="Payload creation via command line" loading="lazy">
+            <img src="../images/payload_creation.png" alt="Payload creation via command line" loading="lazy">
 
             <p>Finally, we pass the raw bytes into the binary as <code>argv[1]</code>. The program executes, the buffer overflows, <code>strcpy</code> adds its termination byte, and the control flow bends to the hidden function.</p>
 
-            <img src="images/successful_exploit.png" alt="Successful exploit execution" loading="lazy">
+            <img src="../images/successful_exploit.png" alt="Successful exploit execution" loading="lazy">
         </div>
 
         <h2 class="fade-in">Conclusion</h2>
@@ -310,3 +310,4 @@ printf '\x56\x11\x40' >> payload</code></pre>
 </body>
 
 </html>
+
