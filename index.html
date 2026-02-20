@@ -346,38 +346,32 @@
         });
       });
 
-      const blogs = [
-        {
-          title: "Analyzing CVE-2024-1086",
-          tag: "SECURITY",
-          excerpt: "Deep dive into Linux Kernel vulnerability replication.",
-          link: "blog/cve-2024-analysis.html", // Path to the detailed page
-        },
-        {
-          title: "Buffer Overflow project",
-          tag: "SECURITY",
-          excerpt: "Buffer overflow attack on the 64bit architecture with partial address manipulation",
-          link: "blog/buffer-overflow.html",
-        },
-      ];
-
-      const container = document.getElementById("blog-container");
-      blogs.forEach((post) => {
-        const div = document.createElement("div");
-        div.className = "card";
-        div.innerHTML = `
+      fetch('posts.json')
+  .then(response => response.json())
+  .then(blogs => {
+    const container = document.getElementById("blog-container");
+    
+    blogs.forEach((post) => {
+      const div = document.createElement("div");
+      div.className = "card";
+      div.innerHTML = `
         <span class="tag">${post.tag}</span>
         <h3>${post.title}</h3>
         <p>${post.excerpt}</p>
         <span style="color:var(--neon-blue); font-size:0.8rem; margin-top:15px; display:block;">Read More →</span>
-    `;
-        // Redirection Logic
-        div.onclick = () => {
-          window.location.href = post.link;
-        };
-        container.appendChild(div);
-      });
+      `;
+      
+      // Redirection Logic
+      div.onclick = () => {
+        window.location.href = post.link;
+      };
+      
+      container.appendChild(div);
+    });
+  })
+  .catch(error => console.error("Error loading posts.json:", error));
     </script>
   </body>
 </html>
+
 
