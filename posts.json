@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "title": "Analyzing Linux Kernel Vulnerability CVE-2024-1086",
+    "date": "Feb 13, 2026",
+    "category": "Systems Security",
+    "excerpt": "A deep dive into replicating the KOOBE framework on modern kernels...",
+    "content": "Full content of your research goes here. You can even include code snippets."
+  },
+  {
+    "id": 2,
+    "title": "AI Diagnostics: My Journey with the Blood Testing Patent",
+    "date": "Jan 20, 2026",
+    "category": "Artificial Intelligence",
+    "excerpt": "How we integrated hybrid ML models into a portable blood testing device.",
+    "content": "Detailed story of the patent process and technology used."
+  }
+]
