@@ -1,0 +1,98 @@
+/* ========================================= */
+/* --- MOBILE RESPONSIVENESS (THE FIX) --- */
+/* ========================================= */
+@media screen and (max-width: 992px) {
+    .orb {
+        opacity: 0.1;
+    }
+
+    /* 1. Hero Layout Reversal */
+    .hero {
+        flex-direction: column;
+        text-align: center;
+        padding: 130px 5% 50px 5%;
+        gap: 30px;
+    }
+
+    .hero-image {
+        order: 1;
+        width: 100%;
+    }
+
+    .hero-image img {
+        max-width: 250px;
+    }
+
+    /* Scales down your avatar */
+
+    .hero-content {
+        order: 2;
+        width: 100%;
+    }
+
+    /* 2. Text Scaling (Fixes Horizontal Scroll) */
+    .hero h1 {
+        font-size: 3rem !important;
+    }
+
+    .hero-content span {
+        font-size: 0.85rem !important;
+        letter-spacing: 1px !important;
+        white-space: normal;
+        /* Allows long text to break lines */
+    }
+
+    /* 3. Center the buttons */
+    .hero-content div[style*="display: flex"] {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    /* 4. Navbar Fixes */
+    nav {
+        padding: 15px 25px;
+        width: 92%;
+    }
+
+    .menu-toggle {
+        display: block !important;
+    }
+
+    /* Creates the Glass Dropdown */
+    .nav-links {
+        position: absolute !important;
+        top: 110%;
+        left: 0;
+        width: 100%;
+        background: rgba(10, 10, 10, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
+        flex-direction: column !important;
+        /* Stacks links */
+        padding: 30px 0;
+        gap: 20px;
+
+        /* Hide logic */
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transform: translateY(-20px);
+        transition: all 0.4s ease;
+    }
+
+    /* Triggers when hamburger is clicked */
+    .nav-links.active {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: all;
+        transform: translateY(0);
+    }
+
+    /* Mobile Education Section Fix */
+    .edu-container {
+        flex-direction: column;
+        /* Stacks them vertically (IIT on top) */
+        gap: 20px;
+    }
+}
