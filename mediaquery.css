@@ -41,6 +41,12 @@
         white-space: normal;
         /* Allows long text to break lines */
     }
+    .hero-content h1 span {
+        font-size: 2rem !important;
+        letter-spacing: 1px !important;
+        white-space: normal;
+        /* Allows long text to break lines */
+    }
 
     /* 3. Center the buttons */
     .hero-content div[style*="display: flex"] {
@@ -95,4 +101,5 @@
         /* Stacks them vertically (IIT on top) */
         gap: 20px;
     }
+
 }
