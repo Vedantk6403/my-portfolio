@@ -1,183 +1,306 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bypassing 64-bit strcpy Constraints | Vedant Karande</title>
     <style>
-        :root {
-            --bg: #050505;
-            --neon-blue: #00f2ff;
-            --text-main: #e0e0e0;
-            --text-muted: #888;
-            --glass-bg: rgba(255, 255, 255, 0.03);
-            --glass-border: rgba(255, 255, 255, 0.08);
-        }
-        
-        body { 
-            background: var(--bg); 
-            color: var(--text-main); 
-            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
-            line-height: 1.8; 
-            padding: 50px 10%; 
-            margin: 0;
-            overflow-x: hidden;
+      :root {
+        --bg: #050505;
+        --neon-blue: #00f2ff;
+        --text-main: #e0e0e0;
+        --text-muted: #888;
+        --glass-bg: rgba(255, 255, 255, 0.03);
+        --glass-border: rgba(255, 255, 255, 0.08);
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text-main);
+        font-family:
+          "Inter",
+          system-ui,
+          -apple-system,
+          sans-serif;
+        line-height: 1.8;
+        padding: 50px 10%;
+        margin: 0;
+        overflow-x: hidden;
+      }
+
+      /* Smooth Scroll & Animations */
+      html {
+        scroll-behavior: smooth;
+      }
+      .fade-in {
+        opacity: 0;
+        transform: translateY(30px);
+        transition:
+          opacity 0.8s ease-out,
+          transform 0.8s ease-out;
+      }
+      .fade-in.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      /* Navigation */
+      .back-btn {
+        display: inline-block;
+        text-decoration: none;
+        color: var(--neon-blue);
+        border: 1px solid var(--neon-blue);
+        padding: 10px 24px;
+        border-radius: 50px;
+        margin-bottom: 40px;
+        font-size: 0.9rem;
+        letter-spacing: 0.5px;
+        transition: all 0.3s ease;
+      }
+      .back-btn:hover {
+        background: var(--neon-blue);
+        color: #000;
+        box-shadow: 0 0 15px var(--neon-blue);
+      }
+
+      /* Typography & Layout */
+      .content {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 2.8rem;
+        color: #fff;
+        margin-bottom: 10px;
+        line-height: 1.2;
+      }
+      h2 {
+        font-size: 1.8rem;
+        color: #fff;
+        margin-top: 50px;
+        border-bottom: 1px solid var(--glass-border);
+        padding-bottom: 10px;
+      }
+      h3 {
+        font-size: 1.3rem;
+        color: var(--neon-blue);
+        margin-top: 30px;
+      }
+      p {
+        font-size: 1.05rem;
+        margin-bottom: 20px;
+      }
+      .metadata {
+        color: var(--text-muted);
+        margin-bottom: 40px;
+        font-family: "Fira Code", monospace;
+        font-size: 0.9rem;
+      }
+
+      /* Media & Inline Code */
+      img {
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid var(--glass-border);
+        margin: 30px 0;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        transition: transform 0.3s ease;
+      }
+      img:hover {
+        transform: scale(1.02);
+      }
+      code {
+        background: #1a1a1a;
+        padding: 3px 6px;
+        border-radius: 4px;
+        color: var(--neon-blue);
+        font-family: "Fira Code", monospace;
+        font-size: 0.9em;
+      }
+
+      /* Custom Stack Diagram */
+      .stack-diagram {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        margin: 40px 0;
+        font-family: "Fira Code", monospace;
+      }
+      .stack-row {
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        padding: 15px;
+        text-align: center;
+        border-radius: 6px;
+        position: relative;
+      }
+      .stack-row.buffer {
+        border-left: 4px solid #27c93f;
+      }
+      .stack-row.rbp {
+        border-left: 4px solid #ffbd2e;
+      }
+      .stack-row.rip {
+        border-left: 4px solid #ff5f56;
+        background: rgba(255, 95, 86, 0.1);
+      }
+      .stack-annotation {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+
+      /* Code Block Styling */
+      .code-container {
+        position: relative;
+        margin: 30px 0;
+      }
+      pre {
+        background: #0d0d0d;
+        color: #d4d4d4;
+        padding: 40px 20px 20px;
+        border-radius: 12px;
+        overflow-x: auto;
+        font-family: "Fira Code", monospace;
+        font-size: 0.95rem;
+        border: 1px solid var(--glass-border);
+        margin: 0;
+      }
+      .copy-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: #2a2a2a;
+        color: #fff;
+        border: 1px solid var(--glass-border);
+        border-radius: 6px;
+        padding: 5px 12px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        opacity: 0;
+        font-family: "Inter", sans-serif;
+      }
+      .code-container:hover .copy-btn {
+        opacity: 1;
+      }
+      .copy-btn:hover {
+        background: var(--neon-blue);
+        color: #000;
+      }
+      .mac-dots {
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        display: flex;
+        gap: 8px;
+      }
+      .mac-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+      .mac-dot.red {
+        background: #ff5f56;
+      }
+      .mac-dot.yellow {
+        background: #ffbd2e;
+      }
+      .mac-dot.green {
+        background: #27c93f;
+      }
+      /* ========================================= */
+      /* --- MOBILE RESPONSIVENESS --- */
+      /* ========================================= */
+
+      @media screen and (max-width: 768px) {
+        body {
+          padding: 30px 5%;
         }
 
-        /* Smooth Scroll & Animations */
-        html { scroll-behavior: smooth; }
-        .fade-in {
-            opacity: 0;
-            transform: translateY(30px);
-            transition: opacity 0.8s ease-out, transform 0.8s ease-out;
-        }
-        .fade-in.visible {
-            opacity: 1;
-            transform: translateY(0);
+        h1 {
+          font-size: 2rem;
+          word-wrap: break-word;
         }
 
-        /* Navigation */
-        .back-btn {
-            display: inline-block;
-            text-decoration: none;
-            color: var(--neon-blue);
-            border: 1px solid var(--neon-blue);
-            padding: 10px 24px;
-            border-radius: 50px;
-            margin-bottom: 40px;
-            font-size: 0.9rem;
-            letter-spacing: 0.5px;
-            transition: all 0.3s ease;
-        }
-        .back-btn:hover { 
-            background: var(--neon-blue); 
-            color: #000; 
-            box-shadow: 0 0 15px var(--neon-blue); 
+        h2 {
+          font-size: 1.5rem;
+          margin-top: 35px;
         }
 
-        /* Typography & Layout */
-        .content { max-width: 800px; margin: 0 auto; }
-        h1 { font-size: 2.8rem; color: #fff; margin-bottom: 10px; line-height: 1.2; }
-        h2 { font-size: 1.8rem; color: #fff; margin-top: 50px; border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; }
-        h3 { font-size: 1.3rem; color: var(--neon-blue); margin-top: 30px; }
-        p { font-size: 1.05rem; margin-bottom: 20px; }
-        .metadata { color: var(--text-muted); margin-bottom: 40px; font-family: 'Fira Code', monospace; font-size: 0.9rem; }
-        
-        /* Media & Inline Code */
-        img { 
-            width: 100%; 
-            border-radius: 12px; 
-            border: 1px solid var(--glass-border); 
-            margin: 30px 0; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            transition: transform 0.3s ease;
+        p {
+          font-size: 1rem;
         }
-        img:hover { transform: scale(1.02); }
-        code { background: #1a1a1a; padding: 3px 6px; border-radius: 4px; color: var(--neon-blue); font-family: 'Fira Code', monospace; font-size: 0.9em; }
-
-        /* Custom Stack Diagram */
-        .stack-diagram {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            margin: 40px 0;
-            font-family: 'Fira Code', monospace;
+        pre {
+          padding: 40px 15px 15px;
+          font-size: 0.85rem;
         }
-        .stack-row {
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            padding: 15px;
-            text-align: center;
-            border-radius: 6px;
-            position: relative;
+        .metadata {
+          font-size: 0.8rem;
         }
-        .stack-row.buffer { border-left: 4px solid #27c93f; }
-        .stack-row.rbp { border-left: 4px solid #ffbd2e; }
-        .stack-row.rip { border-left: 4px solid #ff5f56; background: rgba(255, 95, 86, 0.1); }
-        .stack-annotation { font-size: 0.8rem; color: var(--text-muted); position: absolute; right: 15px; top: 50%; transform: translateY(-50%); }
-
-        /* Code Block Styling */
-        .code-container { position: relative; margin: 30px 0; }
-        pre { 
-            background: #0d0d0d; 
-            color: #d4d4d4; 
-            padding: 40px 20px 20px; 
-            border-radius: 12px; 
-            overflow-x: auto; 
-            font-family: 'Fira Code', monospace; 
-            font-size: 0.95rem; 
-            border: 1px solid var(--glass-border); 
-            margin: 0;
-        }
-        .copy-btn { 
-            position: absolute; top: 10px; right: 10px; background: #2a2a2a; color: #fff; 
-            border: 1px solid var(--glass-border); border-radius: 6px; padding: 5px 12px; 
-            font-size: 12px; cursor: pointer; transition: all 0.2s; opacity: 0; font-family: 'Inter', sans-serif;
-        }
-        .code-container:hover .copy-btn { opacity: 1; }
-        .copy-btn:hover { background: var(--neon-blue); color: #000; }
-        .mac-dots { position: absolute; top: 15px; left: 15px; display: flex; gap: 8px; }
-        .mac-dot { width: 12px; height: 12px; border-radius: 50%; }
-        .mac-dot.red { background: #ff5f56; } 
-        .mac-dot.yellow { background: #ffbd2e; } 
-        .mac-dot.green { background: #27c93f; }
-        /* ========================================= */
-        /* --- MOBILE RESPONSIVENESS --- */
-        /* ========================================= */
-        
-        @media screen and (max-width: 768px) {
-
-            body {
-                padding: 30px 5%; 
-            }
-
-            h1 {
-                font-size: 2rem; 
-                word-wrap: break-word;
-            }
-            
-            h2 {
-                font-size: 1.5rem; 
-                margin-top: 35px;
-            }
-            
-            p {
-                font-size: 1rem;
-            }
-            pre {
-                padding: 40px 15px 15px; 
-                font-size: 0.85rem;
-            }
-            .metadata {
-                font-size: 0.8rem;
-            }
-        }
+      }
     </style>
-</head>
-<body>
-
+  </head>
+  <body>
     <a href="../index.html" class="back-btn">← Back to Portfolio</a>
 
     <article class="content">
-        <div class="fade-in">
-            <span style="color:var(--neon-blue); text-transform:uppercase; font-size:0.9rem; font-weight: 600; letter-spacing: 1px;">Systems Security & Exploit Development</span>
-            <h1>Bypassing 64-bit `strcpy` Constraints: A Partial Overwrite Stack Overflow</h1>
-            <p class="metadata">Published: Feb 20, 2026 | Architecture: x86_64 Linux</p>
-        </div>
+      <div class="fade-in">
+        <span
+          style="
+            color: var(--neon-blue);
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+          "
+          >Systems Security & Exploit Development</span
+        >
+        <h1>
+          Bypassing 64-bit `strcpy` Constraints: A Partial Overwrite Stack
+          Overflow
+        </h1>
+        <p class="metadata">
+          Published: Feb 20, 2026 | Architecture: x86_64 Linux
+        </p>
+      </div>
 
-        <div class="fade-in">
-            <p>While standard buffer overflows on 32-bit architectures are straightforward, porting these exploits to modern 64-bit systems introduces a significant hurdle: <strong>The Null Byte Wall</strong>. Memory addresses in 64-bit space are heavily padded with leading <code>\x00</code> bytes, which instantly terminate string-copying functions like <code>strcpy</code>.</p>
-            <p>In this research, I constructed a vulnerable-by-design environment to demonstrate how to bypass this restriction using a surgically precise <strong>Partial Overwrite</strong> technique to hijack the Instruction Pointer (RIP).</p>
-        </div>
+      <div class="fade-in">
+        <p>
+          While standard buffer overflows on 32-bit architectures are
+          straightforward, porting these exploits to modern 64-bit systems
+          introduces a significant hurdle: <strong>The Null Byte Wall</strong>.
+          Memory addresses in 64-bit space are heavily padded with leading
+          <code>\x00</code> bytes, which instantly terminate string-copying
+          functions like <code>strcpy</code>.
+        </p>
+        <p>
+          In this research, I constructed a vulnerable-by-design environment to
+          demonstrate how to bypass this restriction using a surgically precise
+          <strong>Partial Overwrite</strong> technique to hijack the Instruction
+          Pointer (RIP).
+        </p>
+      </div>
 
-        <h2 class="fade-in">1. The Vulnerable Target</h2>
-        <div class="fade-in">
-            <p>The core of the vulnerability lies in the improper handling of user input via command-line arguments. Here is the source code of our target binary:</p>
-            
-            <div class="code-container">
-                <div class="mac-dots"><div class="mac-dot red"></div><div class="mac-dot yellow"></div><div class="mac-dot green"></div></div>
-                <button class="copy-btn">Copy</button>
-<pre><code>#include &lt;stdio.h&gt;
+      <h2 class="fade-in">1. The Vulnerable Target</h2>
+      <div class="fade-in">
+        <p>
+          The core of the vulnerability lies in the improper handling of user
+          input via command-line arguments. Here is the source code of our
+          target binary:
+        </p>
+
+        <div class="code-container">
+          <div class="mac-dots">
+            <div class="mac-dot red"></div>
+            <div class="mac-dot yellow"></div>
+            <div class="mac-dot green"></div>
+          </div>
+          <button class="copy-btn">Copy</button>
+          <pre><code>#include &lt;stdio.h&gt;
 #include &lt;string.h&gt;
 #include &lt;stdlib.h&gt;
 
@@ -200,146 +323,355 @@ int main(int argc, char **argv) {
     echo_input(argv[1]);
     return 0;
 }</code></pre>
-            </div>
-            <!-- <img src="Vulnerable_program.png" alt="Vulnerable C Source Code" loading="lazy"> -->
-            <p>The vulnerability is textbook: <code>strcpy</code> copies data from <code>argv[1]</code> into a 64-byte <code>buffer</code> until it hits a null byte. If the input exceeds 64 bytes, it spills over into adjacent stack memory.</p>
+        </div>
+        <!-- <img src="Vulnerable_program.png" alt="Vulnerable C Source Code" loading="lazy"> -->
+        <p>
+          The vulnerability is textbook: <code>strcpy</code> copies data from
+          <code>argv[1]</code> into a 64-byte <code>buffer</code> until it hits
+          a null byte. If the input exceeds 64 bytes, it spills over into
+          adjacent stack memory.
+        </p>
+      </div>
+
+      <h2 class="fade-in">2. Lab Setup & Security Posture</h2>
+      <div class="fade-in">
+        <p>
+          To analyze the raw mechanics of the stack frame, I compiled the binary
+          with GCC while explicitly disabling modern compiler mitigations:
+        </p>
+
+        <div class="code-container">
+          <div class="mac-dots">
+            <div class="mac-dot red"></div>
+            <div class="mac-dot yellow"></div>
+            <div class="mac-dot green"></div>
+          </div>
+          <button class="copy-btn">Copy</button>
+          <pre><code>gcc -fno-stack-protector -z execstack -no-pie -o vuln vuln.c</code></pre>
         </div>
 
-        <h2 class="fade-in">2. Lab Setup & Security Posture</h2>
-        <div class="fade-in">
-            <p>To analyze the raw mechanics of the stack frame, I compiled the binary with GCC while explicitly disabling modern compiler mitigations:</p>
+        <ul>
+          <li>
+            <code>-fno-stack-protector</code>: Removes stack canaries, allowing
+            linear stack smashing without triggering a crash abort.
+          </li>
+          <li>
+            <code>-z execstack</code>: Marks the stack as executable (RWX).
+            While not strictly necessary for a Return-to-Function attack, it
+            ensures a clear environment for shellcode injections later.
+          </li>
+          <li>
+            <code>-no-pie</code>: Disables Position Independent Executables,
+            ensuring the binary's code segment is loaded at a static memory
+            address rather than being randomized by ASLR.
+          </li>
+        </ul>
 
-            <div class="code-container">
-                <div class="mac-dots"><div class="mac-dot red"></div><div class="mac-dot yellow"></div><div class="mac-dot green"></div></div>
-                <button class="copy-btn">Copy</button>
-<pre><code>gcc -fno-stack-protector -z execstack -no-pie -o vuln vuln.c</code></pre>
-            </div>
+        <img
+          src="/images/compilation_and_security_vals.png"
+          alt="Checksec output verifying disabled protections"
+          loading="lazy"
+        />
+        <p>
+          Using <code>checksec</code>, we verify the environment.
+          <strong>NX is disabled</strong> (stack execution allowed),
+          <strong>Canary is absent</strong>, and <strong>PIE is off</strong>.
+        </p>
+      </div>
 
-            <ul>
-                <li><code>-fno-stack-protector</code>: Removes stack canaries, allowing linear stack smashing without triggering a crash abort.</li>
-                <li><code>-z execstack</code>: Marks the stack as executable (RWX). While not strictly necessary for a Return-to-Function attack, it ensures a clear environment for shellcode injections later.</li>
-                <li><code>-no-pie</code>: Disables Position Independent Executables, ensuring the binary's code segment is loaded at a static memory address rather than being randomized by ASLR.</li>
-            </ul>
+      <h2 class="fade-in">3. Dynamic Analysis & Offset Calculation</h2>
+      <div class="fade-in">
+        <p>
+          To hijack the control flow, we must overwrite the Return Address (RIP)
+          stored on the stack. But how much padding is required to reach it? I
+          utilized GDB and a cyclic pattern to find the exact offset.
+        </p>
 
-            <img src="../images/compilation_and_security_vals.png" alt="Checksec output verifying disabled protections" loading="lazy">
-            <p>Using <code>checksec</code>, we verify the environment. <strong>NX is disabled</strong> (stack execution allowed), <strong>Canary is absent</strong>, and <strong>PIE is off</strong>.</p>
+        <img
+          src="/images/run_gdb_withpattern.png"
+          alt="Running GDB with a cyclic pattern"
+          loading="lazy"
+        />
+
+        <p>
+          By feeding a cyclic pattern into the program, a
+          <code>SIGSEGV</code> (Segmentation Fault) is triggered upon returning
+          from <code>echo_input</code>.
+        </p>
+
+        <img
+          src="/images/program_crash.png"
+          alt="Segmentation fault in GDB"
+          loading="lazy"
+        />
+        <img
+          src="/images/value_at_topofstack.png"
+          alt="Examining the top of the stack in GDB"
+          loading="lazy"
+        />
+
+        <p>
+          Inspecting the stack pointer (<code>x/1xg $rsp</code>) at the moment
+          of the crash reveals the value <code>0x6341356341346341</code>. Using
+          <code>msf-pattern_offset</code>, this exact hex value equates to a
+          length of <strong>72 bytes</strong>.
+        </p>
+        <img
+          src="/images/offset_calculate.png"
+          alt="Examining the top of the stack in GDB"
+          loading="lazy"
+        />
+      </div>
+
+      <h2 class="fade-in">4. Understanding the 72-Byte Offset</h2>
+      <div class="fade-in">
+        <p>
+          The math behind the 72 bytes perfectly aligns with the x86_64 stack
+          frame architecture:
+        </p>
+
+        <div class="stack-diagram">
+          <div class="stack-row buffer">
+            [ Buffer Space ]
+            <span class="stack-annotation">64 bytes</span>
+          </div>
+          <div class="stack-row rbp">
+            [ Saved Base Pointer (RBP) ]
+            <span class="stack-annotation">8 bytes</span>
+          </div>
+          <div class="stack-row rip">
+            [ Return Address (RIP) ]
+            <span class="stack-annotation">Target</span>
+          </div>
         </div>
 
-        <h2 class="fade-in">3. Dynamic Analysis & Offset Calculation</h2>
-        <div class="fade-in">
-            <p>To hijack the control flow, we must overwrite the Return Address (RIP) stored on the stack. But how much padding is required to reach it? I utilized GDB and a cyclic pattern to find the exact offset.</p>
-            
-            <img src="../images/run_gdb_withpattern.png" alt="Running GDB with a cyclic pattern" loading="lazy">
+        <p>
+          Our input fills the 64-byte buffer, overflows into the 8-byte Saved
+          RBP (64 + 8 = 72), and stops exactly at the precipice of the
+          Instruction Pointer.
+        </p>
+      </div>
 
-            <p>By feeding a cyclic pattern into the program, a <code>SIGSEGV</code> (Segmentation Fault) is triggered upon returning from <code>echo_input</code>.</p>
-            
-            <img src="../images/program_crash.png" alt="Segmentation fault in GDB" loading="lazy">
-            <img src="../images/value_at_topofstack.png" alt="Examining the top of the stack in GDB" loading="lazy">
-            
-            <p>Inspecting the stack pointer (<code>x/1xg $rsp</code>) at the moment of the crash reveals the value <code>0x6341356341346341</code>. Using <code>msf-pattern_offset</code>, this exact hex value equates to a length of <strong>72 bytes</strong>.</p>
-            <img src="../images/offset_calculate.png" alt="Examining the top of the stack in GDB" loading="lazy">
-        </div>
+      <h2 class="fade-in">5. The 64-bit Constraint: Partial Overwrites</h2>
+      <div class="fade-in">
+        <p>
+          Here lies the architectural challenge. The address of our target,
+          <code>secret_function</code>, is <code>0x0000000000401156</code>.
+        </p>
+        <p>
+          If we inject the full 8-byte address in Little Endian format
+          (<code>\x56\x11\x40\x00\x00\x00\x00\x00</code>),
+          <code>strcpy</code> will read the <code>\x56</code>,
+          <code>\x11</code>, <code>\x40</code>, and then instantly stop at the
+          first <code>\x00</code>. The rest of the address is discarded, and the
+          stack alignment is ruined.
+        </p>
 
-        <h2 class="fade-in">4. Understanding the 72-Byte Offset</h2>
-        <div class="fade-in">
-            <p>The math behind the 72 bytes perfectly aligns with the x86_64 stack frame architecture:</p>
-            
-            <div class="stack-diagram">
-                <div class="stack-row buffer">
-                    [ Buffer Space ]
-                    <span class="stack-annotation">64 bytes</span>
-                </div>
-                <div class="stack-row rbp">
-                    [ Saved Base Pointer (RBP) ]
-                    <span class="stack-annotation">8 bytes</span>
-                </div>
-                <div class="stack-row rip">
-                    [ Return Address (RIP) ]
-                    <span class="stack-annotation">Target</span>
-                </div>
-            </div>
+        <img
+          src="/images/Address_of_target_func.png"
+          alt="Finding the target function address"
+          loading="lazy"
+        />
 
-            <p>Our input fills the 64-byte buffer, overflows into the 8-byte Saved RBP (64 + 8 = 72), and stops exactly at the precipice of the Instruction Pointer.</p>
-        </div>
+        <h3>The Solution</h3>
+        <p>
+          We do not overwrite the entire address. We examine the stack
+          <em>before</em> corruption and observe that the upper 5 bytes of the
+          original Return Address are already <code>0x0000000000</code>.
+          Therefore, we only append the lower 3 significant bytes
+          (<code>\x56\x11\x40</code>) to our payload.
+        </p>
+        <p>
+          Crucially, <code>strcpy</code> automatically appends exactly
+          <em>one</em> null byte at the end of a copied string. This terminates
+          our overwrite perfectly, fusing our 3 bytes with the existing zeros on
+          the stack to form the complete, valid 64-bit address.
+        </p>
+      </div>
 
-        <h2 class="fade-in">5. The 64-bit Constraint: Partial Overwrites</h2>
-        <div class="fade-in">
-            <p>Here lies the architectural challenge. The address of our target, <code>secret_function</code>, is <code>0x0000000000401156</code>.</p>
-            <p>If we inject the full 8-byte address in Little Endian format (<code>\x56\x11\x40\x00\x00\x00\x00\x00</code>), <code>strcpy</code> will read the <code>\x56</code>, <code>\x11</code>, <code>\x40</code>, and then instantly stop at the first <code>\x00</code>. The rest of the address is discarded, and the stack alignment is ruined.</p>
-            
-            <img src="../images/Address_of_target_func.png" alt="Finding the target function address" loading="lazy">
+      <h2 class="fade-in">6. Weaponization & Execution</h2>
+      <div class="fade-in">
+        <p>
+          To exploit this, I used Bash to generate a payload containing exactly
+          72 bytes of padding, followed by the 3-byte partial address.
+        </p>
 
-            <h3>The Solution</h3>
-            <p>We do not overwrite the entire address. We examine the stack <em>before</em> corruption and observe that the upper 5 bytes of the original Return Address are already <code>0x0000000000</code>. Therefore, we only append the lower 3 significant bytes (<code>\x56\x11\x40</code>) to our payload.</p>
-            <p>Crucially, <code>strcpy</code> automatically appends exactly <em>one</em> null byte at the end of a copied string. This terminates our overwrite perfectly, fusing our 3 bytes with the existing zeros on the stack to form the complete, valid 64-bit address.</p>
-        </div>
-
-        <h2 class="fade-in">6. Weaponization & Execution</h2>
-        <div class="fade-in">
-            <p>To exploit this, I used Bash to generate a payload containing exactly 72 bytes of padding, followed by the 3-byte partial address.</p>
-
-            <div class="code-container">
-                <div class="mac-dots"><div class="mac-dot red"></div><div class="mac-dot yellow"></div><div class="mac-dot green"></div></div>
-                <button class="copy-btn">Copy</button>
-<pre><code># Generate 72 bytes of padding
+        <div class="code-container">
+          <div class="mac-dots">
+            <div class="mac-dot red"></div>
+            <div class="mac-dot yellow"></div>
+            <div class="mac-dot green"></div>
+          </div>
+          <button class="copy-btn">Copy</button>
+          <pre><code># Generate 72 bytes of padding
 printf 'A%.0s' {1..72} > payload
 
 # Append ONLY the 3 significant bytes in Little Endian
 printf '\x56\x11\x40' >> payload</code></pre>
-            </div>
-
-            <img src="../images/payload_creation.png" alt="Payload creation via command line" loading="lazy">
-
-            <p>Finally, we pass the raw bytes into the binary as <code>argv[1]</code>. The program executes, the buffer overflows, <code>strcpy</code> adds its termination byte, and the control flow bends to the hidden function.</p>
-
-            <img src="../images/successful_exploit.png" alt="Successful exploit execution" loading="lazy">
         </div>
 
-        <h2 class="fade-in">Conclusion</h2>
-        <div class="fade-in">
-            <p>This experiment highlights the mechanical precision required to exploit 64-bit applications. While <code>strcpy</code> acts as a barrier by terminating on null bytes, understanding memory layout allows for sophisticated bypasses like the Partial Overwrite.</p>
-            <p>In production environments, vulnerabilities like this are mitigated by strict boundary enforcement. Developers must entirely avoid functions like <code>strcpy</code> or <code>gets</code>, opting instead for bounded alternatives like <code>strncpy</code> or <code>snprintf</code>.</p>
+        <img
+          src="/images/payload_creation.png"
+          alt="Payload creation via command line"
+          loading="lazy"
+        />
+
+        <p>
+          Finally, we pass the raw bytes into the binary as
+          <code>argv[1]</code>. The program executes, the buffer overflows,
+          <code>strcpy</code> adds its termination byte, and the control flow
+          bends to the hidden function.
+        </p>
+
+        <img
+          src="/images/successful_exploit.png"
+          alt="Successful exploit execution"
+          loading="lazy"
+        />
+      </div>
+      <h2 class="fade-in">7. Mitigation: The `strncpy` Trap</h2>
+      <div class="fade-in">
+        <p>
+          This experiment highlights the mechanical precision required to
+          exploit 64-bit applications. While <code>strcpy</code> acts as a
+          barrier by terminating on null bytes, understanding memory layout
+          allows for sophisticated bypasses like the Partial Overwrite.
+        </p>
+
+        <p>
+          In the real world, the obvious fix is to replace the unbounded
+          <code>strcpy</code> with a bounded function like <code>strncpy</code>.
+          However, this introduces a dangerous trap that catches many junior
+          developers.
+        </p>
+
+        <p>If you patch the code like this:</p>
+
+        <div class="code-container">
+          <div class="mac-dots">
+            <div class="mac-dot red"></div>
+            <div class="mac-dot yellow"></div>
+            <div class="mac-dot green"></div>
+          </div>
+          <button class="copy-btn">Copy</button>
+          <pre><code>// DANGEROUS PATCH
+strncpy(buffer, input, sizeof(buffer));</code></pre>
         </div>
 
+        <p>
+          You have successfully stopped the buffer overflow, but you may have
+          accidentally created a <strong>Memory Leak</strong> (a Buffer
+          Over-Read vulnerability).
+        </p>
+
+        <p>
+          Here is why: If a user inputs exactly 64 bytes (or more) of data,
+          <code>strncpy</code> will fill the entire container,
+          <strong
+            >but it will not append a Null Terminator (<code>\x00</code>) at the
+            end.</strong
+          >
+          When the program later runs
+          <code>printf("You entered: %s", buffer);</code>, the
+          <code>printf</code> function won't know where the string ends. It will
+          read right past your 64 bytes and print whatever raw, sensitive memory
+          is sitting next to it on the stack directly to the user's screen!
+        </p>
+
+        <h3>The Correct Patch</h3>
+        <p>
+          To use <code>strncpy</code> safely, you must intentionally leave one
+          byte empty at the end, and then manually force it to act as a wall (a
+          null terminator):
+        </p>
+
+        <div class="code-container">
+          <div class="mac-dots">
+            <div class="mac-dot red"></div>
+            <div class="mac-dot yellow"></div>
+            <div class="mac-dot green"></div>
+          </div>
+          <button class="copy-btn">Copy</button>
+          <pre><code>// 1. Copy up to 63 bytes, leaving the 64th byte untouched
+strncpy(buffer, input, sizeof(buffer) - 1);
+
+// 2. Manually lock the absolute last byte as a null terminator
+buffer[sizeof(buffer) - 1] = '\0'; </code></pre>
+        </div>
+
+        <p>
+          Alternatively, modern secure C programming often relies on
+          <code>snprintf</code>, which mathematically enforces boundary checks
+          and guarantees a null terminator in a single, safe step:
+        </p>
+
+        <div class="code-container">
+          <div class="mac-dots">
+            <div class="mac-dot red"></div>
+            <div class="mac-dot yellow"></div>
+            <div class="mac-dot green"></div>
+          </div>
+          <button class="copy-btn">Copy</button>
+          <pre><code>// The safest modern approach
+snprintf(buffer, sizeof(buffer), "%s", input);</code></pre>
+        </div>
+      </div>
+
+      <h2 class="fade-in">Conclusion</h2>
+      <div class="fade-in">
+        <p>
+          This experiment highlights the mechanical precision required to
+          exploit 64-bit applications. While <code>strcpy</code> acts as a
+          barrier by terminating on null bytes, understanding memory layout
+          allows for sophisticated bypasses like the Partial Overwrite.
+        </p>
+        <p>
+          In production environments, vulnerabilities like this are mitigated by
+          strict boundary enforcement. Developers must entirely avoid functions
+          like <code>strcpy</code> or <code>gets</code>, opting instead for
+          bounded alternatives like <code>strncpy</code> or
+          <code>snprintf</code>.
+        </p>
+      </div>
     </article>
 
     <script>
-        // Custom Intersection Observer for smooth scrolling fade-ins
-        document.addEventListener("DOMContentLoaded", () => {
-            const elements = document.querySelectorAll('.fade-in');
-            
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('visible');
-                    }
-                });
-            }, { threshold: 0.1 });
+      // Custom Intersection Observer for smooth scrolling fade-ins
+      document.addEventListener("DOMContentLoaded", () => {
+        const elements = document.querySelectorAll(".fade-in");
 
-            elements.forEach(el => observer.observe(el));
-
-            // Copy Button Logic for Code Blocks
-            document.querySelectorAll('.code-container').forEach(container => {
-                const btn = container.querySelector('.copy-btn');
-                const code = container.querySelector('code');
-                
-                btn.addEventListener('click', () => {
-                    navigator.clipboard.writeText(code.innerText).then(() => {
-                        btn.innerText = 'Copied!';
-                        btn.style.color = '#000';
-                        btn.style.background = 'var(--neon-blue)';
-                        setTimeout(() => {
-                            btn.innerText = 'Copy';
-                            btn.style.color = '#fff';
-                            btn.style.background = '#2a2a2a';
-                        }, 2000);
-                    });
-                });
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("visible");
+              }
             });
+          },
+          { threshold: 0.1 },
+        );
+
+        elements.forEach((el) => observer.observe(el));
+
+        // Copy Button Logic for Code Blocks
+        document.querySelectorAll(".code-container").forEach((container) => {
+          const btn = container.querySelector(".copy-btn");
+          const code = container.querySelector("code");
+
+          btn.addEventListener("click", () => {
+            navigator.clipboard.writeText(code.innerText).then(() => {
+              btn.innerText = "Copied!";
+              btn.style.color = "#000";
+              btn.style.background = "var(--neon-blue)";
+              setTimeout(() => {
+                btn.innerText = "Copy";
+                btn.style.color = "#fff";
+                btn.style.background = "#2a2a2a";
+              }, 2000);
+            });
+          });
         });
+      });
     </script>
-</body>
-
+  </body>
 </html>
-
-
