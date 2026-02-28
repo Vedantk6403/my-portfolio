@@ -1,9 +1,10 @@
 [
   
   {
-          "title": "Buffer Overflow project",
+          "title": "Buffer OverFlow on 64-bit System",
           "tag": "SECURITY",
-          "excerpt": "Buffer overflow attack on the 64bit architecture with partial address manipulation",
+          "excerpt": "Bypassing 64-bit `strcpy` Constraints: A Partial Overwrite Stack Overflow",
           "link": "blog/buffer-overflow.html"
         }
 ]
+
