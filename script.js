@@ -109,6 +109,57 @@ navItems.forEach((item) => {
   });
 });
 
+// --- FETCH PORTFOLIO PROJECTS ---
+      const portfolioUrl = './portfolio.json?v=' + new Date().getTime();
+
+      fetch(portfolioUrl)
+        .then(response => {
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          return response.json();
+        })
+        .then(projects => {
+          const container = document.getElementById("portfolio-container");
+          container.innerHTML = '';
+          
+          const topProjects = projects.slice(0, 4);
+
+          topProjects.forEach((proj, index) => {
+            const div = document.createElement("div");
+            div.className = `card reveal stagger-${index + 1}`;
+            
+            // Check if the link is empty
+            const isWIP = !proj.link || proj.link === "";
+            
+            div.innerHTML = `
+              <span class="tag">${proj.field}</span>
+              <h3>${proj.title}</h3>
+              <p>${proj.description}</p>
+              
+              <span style="color:${isWIP ? '#666' : 'var(--neon-blue)'}; font-size:0.8rem; margin-top:15px; display:block;">
+                ${isWIP ? 'Uploading Soon ⏳' : 'View Repository →'}
+              </span>
+            `;
+            
+            // Only add the click redirection and pointer cursor if a link exists
+            if (!isWIP) {
+                div.style.cursor = "pointer";
+                div.onclick = () => {
+                    window.open(proj.link, '_blank');
+                };
+            } else {
+                // Keep the default arrow cursor so it doesn't look like a broken button
+                div.style.cursor = "default";
+            }
+            
+            container.appendChild(div);
+          });
+        })
+        .catch(error => {
+          console.error("Error loading portfolio.json:", error);
+          document.getElementById("portfolio-container").innerHTML = 
+            `<p style="color: #888;">Projects currently loading or unavailable.</p>`;
+        });
+
 fetch("./posts.json")
   .then((response) => response.json())
   .then((blogs) => {

@@ -1,0 +1,14 @@
+[
+  {
+    "title": "x86_64 Vulnerability Framework",
+    "field": "EXPLOIT DEV",
+    "description": "Engineered a vulnerable-by-design C environment to research memory corruption, demonstrating privilege escalation via partial RIP overwrites.",
+    "link": "https://github.com/Vedantk6403/Buffer-Overflow-x64"
+  },
+  {
+    "title": "Algorithmic Cryptanalysis",
+    "field": "CRYPTOGRAPHY",
+    "description": "Developed automated scripts to break Vigenère and Substitution ciphers, alongside solving the Discrete Logarithm Problem (DLP).",
+    "link": ""
+  }
+]
