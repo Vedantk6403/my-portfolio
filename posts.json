@@ -2,9 +2,15 @@
   
   {
           "title": "Buffer OverFlow on 64-bit System",
-          "tag": "SECURITY",
+          "tag": "EXPLOIT DEV",
           "excerpt": "Bypassing 64-bit `strcpy` Constraints: A Partial Overwrite Stack Overflow",
           "link": "blog/buffer-overflow.html"
+        },
+  {
+          "title": "Full-Chain SUID Escalation",
+          "tag": "EXPLOIT DEV",
+          "excerpt": "Chaining a Format String vulnerability for memory leaks with a classic Buffer Overflow to achieve root. A step-by-step analysis of bypassing ASLR, PIE, and Canaries.",
+          "link": "blog/privilege-escalation.html"
         }
 ]
 

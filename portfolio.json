@@ -6,6 +6,12 @@
     "link": "https://github.com/Vedantk6403/Buffer-Overflow-x64"
   },
   {
+    "title": "SUID Fullchain Bypass",
+    "field": "EXPLOIT DEV",
+    "description": "A full-chain 64-bit Linux exploit chaining a Format String leak and Buffer Overflow to bypass ASLR, PIE, NX, and Canaries for SUID privilege escalation.",
+    "link": "https://github.com/Vedantk6403/suid-fullchain-bypass"
+  },
+  {
     "title": "Algorithmic Cryptanalysis",
     "field": "CRYPTOGRAPHY",
     "description": "Developed automated scripts to break Vigenère and Substitution ciphers, alongside solving the Discrete Logarithm Problem (DLP).",
