@@ -1,15 +1,21 @@
 [
   {
-    "title": "x86_64 Vulnerability Framework",
-    "field": "EXPLOIT DEV",
-    "description": "Engineered a vulnerable-by-design C environment to research memory corruption, demonstrating privilege escalation via partial RIP overwrites.",
-    "link": "https://github.com/Vedantk6403/Buffer-Overflow-x64"
+    "title": "KOOBE-Guard: Kernel Exploit Mitigation",
+    "field": "SYSTEMS SECURITY",
+    "description": "Engineered an active IPS kernel module utilizing Kprobes and Temporal Gap Tracking to dynamically neutralize the CVE-2024-1086 double-free vulnerability.",
+    "link": "https://github.com/Vedantk6403/KOOBE-Guard"
   },
   {
     "title": "SUID Fullchain Bypass",
     "field": "EXPLOIT DEV",
     "description": "A full-chain 64-bit Linux exploit chaining a Format String leak and Buffer Overflow to bypass ASLR, PIE, NX, and Canaries for SUID privilege escalation.",
     "link": "https://github.com/Vedantk6403/suid-fullchain-bypass"
+  },
+  {
+    "title": "x86_64 Vulnerability Framework",
+    "field": "EXPLOIT DEV",
+    "description": "Engineered a vulnerable-by-design C environment to research memory corruption, demonstrating privilege escalation via partial RIP overwrites.",
+    "link": "https://github.com/Vedantk6403/Buffer-Overflow-x64"
   },
   {
     "title": "Algorithmic Cryptanalysis",

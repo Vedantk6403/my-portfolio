@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KOOBE-Guard: Active Temporal Mitigation | Vedant Karande</title>
+    <link rel="stylesheet" href="./blog.css">
+  </head>
+  <body>
+    <a href="../index.html" class="back-btn">← Back to Portfolio</a>
+
+    <article class="content">
+      <div class="fade-in">
+        <span
+          style="
+            color: var(--neon-blue);
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+          "
+          >Systems Security & Kernel Engineering</span
+        >
+        <h1>
+          KOOBE-Guard: Active Temporal Mitigation of Kernel Double-Free Vulnerabilities
+        </h1>
+        <p class="metadata">
+          Published: May 2026 | Architecture: x86_64 Linux (Kernel 6.6.0)
+        </p>
+        <a href="https://github.com/Vedantk6403/KOOBE-Guard" target="_blank" class="github-repo-btn fade-in">
+          <svg viewBox="0 0 24 24" width="20" height="20">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          View Source Code on GitHub
+        </a>
+      </div>
+
+      <div class="fade-in">
+        <p>
+          The Linux kernel represents the absolute foundation of system security; any memory corruption at Ring 0 can lead to total system compromise, rendering all user-space security mechanisms completely obsolete[cite: 9]. Modern operating systems utilize the SLUB allocator to manage memory with extreme performance, implicitly trusting that subsystems will perfectly manage their allocations[cite: 9]. 
+        </p>
+        <p>
+          However, complex logic errors frequently lead to catastrophic memory mismanagement[cite: 9]. In this project, I engineered <strong>KOOBE-Guard</strong>—an active Intrusion Prevention System (IPS) implemented as a Loadable Kernel Module (LKM) to dynamically neutralize the severe <code>CVE-2024-1086</code> double-free vulnerability[cite: 9].
+        </p>
+      </div>
+
+      <h2 class="fade-in">1. The Vulnerability: CVE-2024-1086</h2>
+      <div class="fade-in">
+        <p>
+          This specific vulnerability resides in the <code>nft_verdict_init()</code> function of the Netfilter (<code>nf_tables</code>) subsystem[cite: 9]. Because of an error-handling logic failure, the system accidentally instructs the SLUB allocator to free the exact same piece of memory twice[cite: 9]. 
+        </p>
+        <p>
+          Unprivileged users can interact with these network filtering hooks via user namespaces and Netlink sockets[cite: 9]. This allows an attacker to intentionally trigger the double-free, corrupting the fundamental linked-list structure of the kernel's freelist to force overlapping memory allocations[cite: 9]. By overlapping user data with highly privileged Page Table Entries (PTE/PMD), the attacker secures arbitrary memory read/write capabilities, leading to full Local Privilege Escalation (LPE)[cite: 9].
+        </p>
+      </div>
+
+      <h2 class="fade-in">2. Designing the Virtual Laboratory</h2>
+      <div class="fade-in">
+        <p>
+          To safely detonate and study this vulnerability without risking host system integrity, I constructed a deterministic, hardware-accelerated virtual laboratory[cite: 9]. The environment consisted of an Ubuntu Host on VMware Workstation, running a nested QEMU hypervisor[cite: 9].
+        </p>
+
+        <img src="../images/koobe/VMWare%20with%20Ubuntu%20Distro.png" alt="VMWare with Ubuntu Distro configuration" loading="lazy" style="margin-top: 20px;">
+        <p style="font-size: 0.9em; font-style: italic; text-align: center; color: #888;">
+          Figure 1: The nested hypervisor setup utilizing VMware and QEMU.
+        </p>
+
+        <p>
+          The guest system ran a custom-compiled Linux 6.6.0 kernel with a Debian "Trixie" root filesystem[cite: 9]. Compiling the kernel introduced significant challenges, as minimal kernel builds strip out necessary subsystems required by standard exploit payloads[cite: 9]. I had to compile massive, unoptimized <code>bzImage</code> files to replicate exact production configurations[cite: 9].
+        </p>
+
+        <img src="../images/koobe/Enabling%20the%20nf_tables%20for%20kernel.png" alt="Enabling nf_tables in kernel config" loading="lazy" style="margin-top: 20px;">
+        <p style="font-size: 0.9em; font-style: italic; text-align: center; color: #888;">
+          Figure 2: Customizing the kernel configuration to enable vulnerable Netfilter subsystems.
+        </p>
+      </div>
+
+      <h2 class="fade-in">3. Exploitation & Heap Feng Shui</h2>
+      <div class="fade-in">
+        <p>
+          During the initial phase, I successfully weaponized the exploit from an unprivileged <code>kali</code> user account[cite: 9]. The exploit sequence relied heavily on <strong>Heap Feng Shui</strong>[cite: 9]. By rapidly spraying the heap with 16,000 PTE structures before triggering the bug, I forced a deterministic double-free state directly over sensitive page table entries[cite: 9].
+        </p>
+
+        <img src="../images/koobe/ExploitPt1.png" alt="Running the first phase of the exploit" loading="lazy" style="margin-top: 20px;">
+        <p style="font-size: 0.9em; font-style: italic; text-align: center; color: #888;">
+          Figure 3: Initiating the heap grooming and Netlink socket exploitation sequence.
+        </p>
+
+        <img src="../images/koobe/Verifying privilege on  kernel shell.png" alt="Successful root privilege escalation" loading="lazy" style="margin-top: 20px;">
+        <p style="font-size: 0.9em; font-style: italic; text-align: center; color: #888;">
+          Figure 4: Exploitation success. Arbitrary memory read/write achieved, spawning a root shell.
+        </p>
+      </div>
+
+      <h2 class="fade-in">4. The Defense: Active Temporal Gap Tracking</h2>
+      <div class="fade-in">
+        <p>
+          Traditional mitigations are severely flawed for production servers[cite: 9]. KASAN utilizes massive shadow memory mapping, resulting in 200%-300% CPU overhead[cite: 9]. Control Flow Integrity (CFI) is fast but completely blind to data-oriented page table attacks[cite: 9]. 
+        </p>
+        <p>
+          I engineered <strong>KOOBE-Guard</strong> to bridge this gap via <strong>Active Temporal Gap Tracking</strong>[cite: 9]. The module injects a Kprobe directly into the <code>kfree</code> execution path[cite: 9]. When memory is freed, the module records the exact nanosecond timestamp via <code>ktime_get_ns()</code>[cite: 9]. If a subsequent request to free the exact same address occurs, the module calculates the temporal delta[cite: 9]. 
+        </p>
+        <p>
+          Because standard memory recycling takes tens of thousands of nanoseconds, while an exploit's unwinding sequence is virtually instantaneous, KOOBE mathematically filters out false positives[cite: 9]. Through extensive benchmarking, I tuned the temporal threshold to exactly <strong>5,000 nanoseconds (5&mu;s)</strong>[cite: 9].
+        </p>
+
+        <h3>Active Parameter Nullification</h3>
+        <p>
+          Once a malicious temporal signature is detected, KOOBE-Guard actively intervenes[cite: 9]. By rewriting the CPU register mid-flight, it drops the invalid memory request:
+        </p>
+
+        <div class="code-container">
+          <div class="mac-dots">
+            <div class="mac-dot red"></div>
+            <div class="mac-dot yellow"></div>
+            <div class="mac-dot green"></div>
+          </div>
+          <button class="copy-btn">Copy</button>
+          <pre><code>// Conceptual representation of the KOOBE-Guard Kprobe intervention
+if (temporal_gap < EXPLOIT_THRESHOLD_NS) {
+    printk(KERN_ALERT "KOOBE: Double-Free Signature Detected! Delta: %llu ns\n", temporal_gap);
+    
+    // Active Parameter Nullification
+    // Manually rewrite the CPU's destination index register to NULL mid-flight
+    regs->di = 0; 
+    
+    // The kernel will now safely execute kfree(NULL), preventing SLUB corruption.
+}</code></pre>
+        </div>
+      </div>
+
+      <h2 class="fade-in">5. Quantitative Evaluation</h2>
+      <div class="fade-in">
+        <p>
+          To rigorously test the defense, I developed automated testing scripts (<code>hit_rate.sh</code>) to launch the exploit recursively[cite: 9]. KOOBE-Guard achieved a <strong>100% Interception Rate</strong>, neutralizing the double-free every single time[cite: 9].
+        </p>
+        <p>
+          Furthermore, I benchmarked performance using a filesystem traversal stress-test while clearing the page cache (<code>drop_caches</code>)[cite: 9]. The results were staggering when compared to KASAN[cite: 9]:
+        </p>
+        
+        <ul>
+            <li><strong>Memory Footprint:</strong> KOOBE-Guard consumed less than 1MB, sustaining the baseline 57MB total system RAM[cite: 9]. KASAN, in theory, demands a massive 185MB footprint[cite: 9].</li>
+            <li><strong>CPU Latency:</strong> The baseline execution took 2.01 seconds[cite: 9]. KOOBE-Guard added microscopic overhead, completing in 2.25 seconds, whereas KASAN would stall the system at 6.03 seconds[cite: 9].</li>
+        </ul>
+      </div>
+
+      <h2 class="fade-in">6. Future Work: eBPF & Deep-State Sanitization</h2>
+      <div class="fade-in">
+        <p>
+          While KOOBE-Guard brilliantly neutralizes the exploit, it leaves a dangling Use-After-Free (UAF) pointer in the kernel[cite: 9]. When the kernel's garbage collector attempts to tear down the attacker's fake namespace, it hits this dangling pointer, causing a kernel panic[cite: 9]. 
+        </p>
+        <p>
+          My future work involves implementing "Deep-State Pointer Sanitization" to actively trace and safely nullify the dangling pointer back to the <code>nft_verdict_init</code> struct before the garbage collector initiates tear-down[cite: 9]. Additionally, porting this temporal tracking logic from standard LKMs into the modern <strong>eBPF (Extended Berkeley Packet Filter)</strong> architecture will provide an even safer deployment model for production enterprise environments[cite: 9].
+        </p>
+      </div>
+    </article>
+
+    <script src="./blog.js"></script>
+  </body>
+</html>
