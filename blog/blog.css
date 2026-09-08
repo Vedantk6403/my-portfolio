@@ -1,3 +1,10 @@
+/* Import FontAwesome and Main Stylesheets */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
+@import url('../style.css');
+@import url('../mediaquery.css');
+
+/* Your existing blog.css code starts here... */
+
 :root {
         --bg: #050505;
         --neon-blue: #00f2ff;
@@ -184,26 +191,10 @@
         background: var(--neon-blue);
         color: #000;
       }
-      .mac-dots {
+      .code-container .mac-dots {
         position: absolute;
         top: 15px;
         left: 15px;
-        display: flex;
-        gap: 8px;
-      }
-      .mac-dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-      }
-      .mac-dot.red {
-        background: #ff5f56;
-      }
-      .mac-dot.yellow {
-        background: #ffbd2e;
-      }
-      .mac-dot.green {
-        background: #27c93f;
       }
 
       /* --- GITHUB REPO BUTTON --- */
